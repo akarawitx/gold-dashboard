@@ -39,6 +39,21 @@
         }"
       >🔔 Alerts</button>
 
+      <button
+        @click="showJournal = !showJournal"
+        :style="{
+          padding: '4px 12px',
+          borderRadius: '4px',
+          border: '1px solid #A78BFA',
+          cursor: 'pointer',
+          fontSize: '12px',
+          fontWeight: '500',
+          background: showJournal ? '#A78BFA' : 'transparent',
+          color: showJournal ? '#111827' : '#A78BFA',
+          marginLeft: '4px',
+        }"
+      >📓 Journal</button>
+
       <!-- Indicator Toggles -->
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button v-for="ind in indicators" :key="ind.key" @click="toggleIndicator(ind.key)" :style="{
@@ -89,6 +104,12 @@
         <AlertPanel />
       </div>
 
+      <!-- Journal Panel -->
+      <div v-if="showJournal"
+        style="width:340px;flex-shrink:0;border:1px solid #374151;border-radius:8px;overflow:hidden">
+        <JournalPanel />
+      </div>
+
     </div>
 
   </div>
@@ -99,6 +120,7 @@ import { reactive, ref, onMounted } from 'vue'
 import { useChartStore } from './stores/chart'
 import ChartView from './components/ChartView.vue'
 import AlertPanel from './components/AlertPanel.vue'
+import JournalPanel from './components/JournalPanel.vue'
 import { useWebSocket } from './composables/useWebSocket'
 
 const store = useChartStore()
@@ -138,6 +160,7 @@ const activeIndicators = reactive({
 })
 
 const showAlerts = ref(false)
+const showJournal = ref(false)
 const atrValue = ref(null)
 
 function updateAtr(val) {
