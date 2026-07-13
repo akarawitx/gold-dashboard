@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment files (สำคัญมาก อย่า push ขึ้น git)
+.env
+.env.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
