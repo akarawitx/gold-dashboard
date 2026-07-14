@@ -44,12 +44,8 @@
         <!-- Threshold -->
         <div>
           <label style="font-size:11px;color:#9CA3AF;display:block;margin-bottom:4px">ค่า</label>
-          <input
-            v-model.number="form.threshold"
-            type="number"
-            placeholder="เช่น 30"
-            style="width:100%;background:#374151;border:1px solid #4B5563;color:#f3f4f6;padding:6px 8px;border-radius:6px;font-size:13px"
-          />
+          <input v-model="form.threshold" type="number" placeholder="เช่น 30"
+            style="width:100%;background:#374151;border:1px solid #4B5563;color:#f3f4f6;padding:6px 8px;border-radius:6px;font-size:13px" />
         </div>
       </div>
 
@@ -71,17 +67,12 @@
         <!-- Cooldown -->
         <div>
           <label style="font-size:11px;color:#9CA3AF;display:block;margin-bottom:4px">Cooldown (นาที)</label>
-          <input
-            v-model.number="form.cooldown_minutes"
-            type="number"
-            style="width:100%;background:#374151;border:1px solid #4B5563;color:#f3f4f6;padding:6px 8px;border-radius:6px;font-size:13px"
-          />
+          <input v-model.number="form.cooldown_minutes" type="number"
+            style="width:100%;background:#374151;border:1px solid #4B5563;color:#f3f4f6;padding:6px 8px;border-radius:6px;font-size:13px" />
         </div>
       </div>
 
-      <button
-        @click="handleCreate"
-        :disabled="!form.threshold"
+      <button @click="handleCreate" :disabled="form.threshold === '' || form.threshold === null || form.threshold === undefined"
         style="width:100%;padding:8px;background:#facc15;color:#111827;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">
         + เพิ่ม Alert
       </button>
@@ -93,8 +84,7 @@
         กำลังโหลด...
       </div>
 
-      <div v-else-if="store.alerts.length === 0"
-        style="text-align:center;color:#6B7280;padding:20px;font-size:13px">
+      <div v-else-if="store.alerts.length === 0" style="text-align:center;color:#6B7280;padding:20px;font-size:13px">
         ยังไม่มี Alert — เพิ่มด้านบนได้เลย
       </div>
 
@@ -110,17 +100,16 @@
 
           <div style="display:flex;gap:6px;align-items:center">
             <!-- Active toggle -->
-            <button @click="store.toggleAlert(alert.id)"
-              :style="{
-                padding: '3px 10px',
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: '500',
-                background: alert.is_active ? '#166534' : '#374151',
-                color: alert.is_active ? '#86efac' : '#9CA3AF',
-              }">
+            <button @click="store.toggleAlert(alert.id)" :style="{
+              padding: '3px 10px',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: '500',
+              background: alert.is_active ? '#166534' : '#374151',
+              color: alert.is_active ? '#86efac' : '#9CA3AF',
+            }">
               {{ alert.is_active ? 'เปิด' : 'ปิด' }}
             </button>
 
@@ -152,10 +141,10 @@ import { useAlertStore } from '../stores/alerts'
 const store = useAlertStore()
 
 const form = reactive({
-  indicator:       'rsi',
-  operator:        '<',
-  threshold:       30,
-  timeframe:       '1h',
+  indicator: 'rsi',
+  operator: '<',
+  threshold: '0',
+  timeframe: '1h',
   cooldown_minutes: 60,
 })
 
