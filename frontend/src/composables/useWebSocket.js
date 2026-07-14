@@ -25,10 +25,12 @@ export function useWebSocket() {
       }
     };
 
+    let reconnectTimer = null;
+
     ws.onclose = () => {
       connected.value = false;
       console.log("⚠️ WS disconnected — reconnecting in 3s...");
-      setTimeout(connect, 3000);
+      reconnectTimer = setTimeout(connect, 3000);
     };
 
     ws.onerror = (err) => {
@@ -37,6 +39,7 @@ export function useWebSocket() {
   }
 
   function disconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws) ws.close();
   }
 

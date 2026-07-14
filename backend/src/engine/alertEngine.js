@@ -63,7 +63,7 @@ async function runAlertCheck() {
       }
     }
   } catch (err) {
-    console.error('[Alert Engine] Error:', err.message)
+    console.error('[Alert Engine] Error:', err.message, err.stack)
   }
 }
 

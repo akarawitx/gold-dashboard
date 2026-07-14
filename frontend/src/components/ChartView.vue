@@ -189,12 +189,15 @@ watch(() => props.activeIndicators.macd, async () => {
     height: macdContainer.value.clientHeight,
   })
 })
-watch(() => props.activeIndicators.rsi, async () => {
+watch(() => props.activeIndicators.rsi, async (val) => {
   await nextTick()
-  rsiChart?.applyOptions({
-    width: rsiContainer.value.clientWidth,
-    height: rsiContainer.value.clientHeight,
-  })
+  if (val && rsiContainer.value) {
+    rsiChart?.applyOptions({
+      width:  rsiContainer.value.clientWidth,
+      height: rsiContainer.value.clientHeight,
+    })
+    rsiChart?.timeScale().fitContent()
+  }
 })
 
 watch(() => store.candles, (newCandles) => {
