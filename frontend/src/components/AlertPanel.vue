@@ -160,7 +160,7 @@ const form = reactive({
 })
 
 async function handleCreate() {
-  if (!form.threshold && form.threshold !== 0) return
+  if (form.threshold === null || form.threshold === undefined || form.threshold === '') return
   await store.createAlert({ ...form })
 }
 
