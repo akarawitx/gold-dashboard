@@ -1,22 +1,6 @@
-const nodemailer = require('nodemailer')
+const sgMail = require('@sendgrid/mail')
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  })
-}
+sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 function getSignalAdvice(indicator, operator, threshold, value) {
   const signals = []
@@ -36,10 +20,16 @@ function getSignalAdvice(indicator, operator, threshold, value) {
       signals.push('RSI สูงกว่า 70 → โซน Overbought → ราคามักกลับตัวลง')
       signals.push('รอแท่งเทียนสีแดงยืนยันก่อนเข้า')
       signals.push('วาง Stop Loss เหนือ High ล่าสุด')
-    } else {
-      action = '⚪ รอดูสถานการณ์'
+    } else if (value < 50) {
+      action = '🔴 SELL / Short'
       confidence = 'ต่ำ'
-      signals.push('RSI อยู่ในโซนกลาง ยังไม่มีสัญญาณชัดเจน')
+      signals.push('RSI ต่ำกว่า 50 → Momentum ขาลง')
+      signals.push('ใช้ร่วมกับ indicator อื่นยืนยัน')
+    } else {
+      action = '🟢 BUY / Long'
+      confidence = 'ต่ำ'
+      signals.push('RSI สูงกว่า 50 → Momentum ขาขึ้น')
+      signals.push('ใช้ร่วมกับ indicator อื่นยืนยัน')
     }
   } else if (indicator === 'ema20' || indicator === 'ema50' || indicator === 'ema200') {
     if (operator === '>' || operator === 'cross_above') {
@@ -55,7 +45,7 @@ function getSignalAdvice(indicator, operator, threshold, value) {
       signals.push('เข้า Sell เมื่อราคา pullback มาแตะเส้น EMA')
       signals.push('วาง Stop Loss เหนือเส้น EMA')
     }
-  } else if (indicator === 'macd') {
+  } else if (indicator === 'macd' || indicator === 'macdHist') {
     if (operator === '>' || operator === 'cross_above') {
       action = '🟢 BUY / Long'
       confidence = 'ปานกลาง'
@@ -81,74 +71,45 @@ function getSignalAdvice(indicator, operator, threshold, value) {
     signals.push('ราคาแตะ Bollinger Band ล่าง → โซน Oversold')
     signals.push('มักเกิด reversal กลับขึ้นไป')
     signals.push('รอแท่งเทียนยืนยันก่อนเข้า Buy')
-  } else if (indicator === 'macdHist') {
-    if (value > 0) {
-      action = '🟢 BUY / Long'
-      confidence = 'ปานกลาง'
-      signals.push('MACD Histogram เป็นบวก → แรง Momentum ขาขึ้น')
-      signals.push('ยิ่ง Histogram สูง ยิ่ง Momentum แรง')
-    } else {
-      action = '🔴 SELL / Short'
-      confidence = 'ปานกลาง'
-      signals.push('MACD Histogram เป็นลบ → แรง Momentum ขาลง')
-      signals.push('ยิ่ง Histogram ต่ำ ยิ่ง Momentum แรง')
-    }
   } else {
-    if (operator === '>' || operator === 'cross_above' || operator === '>=') {
-      action = '🟢 BUY / Long'
-      confidence = 'ปานกลาง'
-      signals.push(`${indicator.toUpperCase()} ผ่านเงื่อนไข ${operator} ${threshold}`)
-    } else {
-      action = '🔴 SELL / Short'
-      confidence = 'ปานกลาง'
-      signals.push(`${indicator.toUpperCase()} ผ่านเงื่อนไข ${operator} ${threshold}`)
-    }
+    action = operator === '>' || operator === '>=' || operator === 'cross_above'
+      ? '🟢 BUY / Long' : '🔴 SELL / Short'
+    confidence = 'ปานกลาง'
+    signals.push(`${indicator.toUpperCase()} ผ่านเงื่อนไข ${operator} ${threshold}`)
   }
 
   return { action, confidence, signals }
 }
 
 async function sendAlertEmail({ indicator, operator, threshold, value, price }) {
-  const transporter = createTransporter()
   const { action, confidence, signals } = getSignalAdvice(indicator, operator, threshold, value)
 
   const operatorLabel = {
-    '>':           'มากกว่า',
-    '<':           'น้อยกว่า',
-    '>=':          'มากกว่าหรือเท่ากับ',
-    '<=':          'น้อยกว่าหรือเท่ากับ',
-    'cross_above': 'ข้ามขึ้นเหนือ',
-    'cross_below': 'ข้ามลงต่ำกว่า',
+    '>': 'มากกว่า', '<': 'น้อยกว่า',
+    '>=': 'มากกว่าหรือเท่ากับ', '<=': 'น้อยกว่าหรือเท่ากับ',
+    'cross_above': 'ข้ามขึ้นเหนือ', 'cross_below': 'ข้ามลงต่ำกว่า',
   }[operator] || operator
 
   const actionColor = action.includes('BUY') ? '#16a34a' : action.includes('SELL') ? '#dc2626' : '#6b7280'
-  const subject = `${action.includes('BUY') ? '🟢' : action.includes('SELL') ? '🔴' : '⚪'} Gold Alert: ${indicator.toUpperCase()} ${operatorLabel} ${threshold}`
+  const emoji = action.includes('BUY') ? '🟢' : action.includes('SELL') ? '🔴' : '⚪'
+  const subject = `${emoji} Gold Alert: ${indicator.toUpperCase()} ${operatorLabel} ${threshold}`
 
   const signalRows = signals.map(s => `
     <tr>
-      <td style="padding:6px 8px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6">
-        • ${s}
-      </td>
+      <td style="padding:6px 8px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6">• ${s}</td>
     </tr>
   `).join('')
 
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#f9fafb;padding:20px;border-radius:12px">
-
       <div style="background:#111827;padding:16px 20px;border-radius:8px;margin-bottom:16px">
         <h2 style="color:#facc15;margin:0;font-size:18px">⚡ XAU/USD Gold Alert</h2>
         <p style="color:#9ca3af;margin:4px 0 0;font-size:13px">Gold Trading Dashboard</p>
       </div>
-
-      <!-- Action Box -->
       <div style="background:${actionColor};padding:14px 20px;border-radius:8px;margin-bottom:16px;text-align:center">
         <div style="color:#fff;font-size:22px;font-weight:700">${action}</div>
-        <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:4px">
-          ความน่าเชื่อถือของสัญญาณ: ${confidence}
-        </div>
+        <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:4px">ความน่าเชื่อถือ: ${confidence}</div>
       </div>
-
-      <!-- Price & Indicator Info -->
       <div style="background:#fff;border-radius:8px;overflow:hidden;margin-bottom:16px;border:1px solid #e5e7eb">
         <table style="width:100%;border-collapse:collapse">
           <tr style="background:#f3f4f6">
@@ -173,35 +134,22 @@ async function sendAlertEmail({ indicator, operator, threshold, value, price }) 
           </tr>
         </table>
       </div>
-
-      <!-- Signal Analysis -->
       <div style="background:#fff;border-radius:8px;overflow:hidden;margin-bottom:16px;border:1px solid #e5e7eb">
-        <div style="padding:10px 16px;background:#1e3a5f;color:#fff;font-size:13px;font-weight:600">
-          📊 การวิเคราะห์สัญญาณ
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          ${signalRows}
-        </table>
+        <div style="padding:10px 16px;background:#1e3a5f;color:#fff;font-size:13px;font-weight:600">📊 การวิเคราะห์สัญญาณ</div>
+        <table style="width:100%;border-collapse:collapse">${signalRows}</table>
       </div>
-
-      <!-- Warning -->
       <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:12px">
         <p style="margin:0;font-size:12px;color:#92400e">
-          ⚠️ <strong>คำเตือน:</strong> สัญญาณนี้เป็นเพียงข้อมูลประกอบการตัดสินใจเท่านั้น
-          ควรดูกราฟและปัจจัยอื่นๆ ประกอบก่อนเข้าออร์เดอร์ทุกครั้ง
-          การเทรด Forex มีความเสี่ยงสูง
+          ⚠️ <strong>คำเตือน:</strong> สัญญาณนี้เป็นเพียงข้อมูลประกอบการตัดสินใจเท่านั้น การเทรด Forex มีความเสี่ยงสูง
         </p>
       </div>
-
-      <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">
-        แจ้งเตือนจาก XAU/USD Gold Dashboard
-      </p>
+      <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">แจ้งเตือนจาก XAU/USD Gold Dashboard</p>
     </div>
   `
 
-  await transporter.sendMail({
-    from:    `"Gold Dashboard" <${process.env.GMAIL_USER}>`,
+  await sgMail.send({
     to:      process.env.GMAIL_USER,
+    from:    process.env.GMAIL_USER,
     subject,
     html,
   })
