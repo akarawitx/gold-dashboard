@@ -1,104 +1,139 @@
-const sgMail = require('@sendgrid/mail')
+const sgMail = require("@sendgrid/mail");
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 function getSignalAdvice(indicator, operator, threshold, value) {
-  const signals = []
-  let action = ''
-  let confidence = ''
+  const signals = [];
+  let action = "";
+  let confidence = "";
 
-  if (indicator === 'rsi') {
+  if (indicator === "rsi") {
     if (value < 30) {
-      action = '🟢 BUY / Long'
-      confidence = 'ปานกลาง'
-      signals.push('RSI ต่ำกว่า 30 → โซน Oversold → ราคามักกลับตัวขึ้น')
-      signals.push('รอแท่งเทียนสีเขียวยืนยันก่อนเข้า')
-      signals.push('วาง Stop Loss ใต้ Low ล่าสุด')
+      action = "🟢 BUY / Long";
+      confidence = "ปานกลาง";
+      signals.push("RSI ต่ำกว่า 30 → โซน Oversold → ราคามักกลับตัวขึ้น");
+      signals.push("รอแท่งเทียนสีเขียวยืนยันก่อนเข้า");
+      signals.push("วาง Stop Loss ใต้ Low ล่าสุด");
     } else if (value > 70) {
-      action = '🔴 SELL / Short'
-      confidence = 'ปานกลาง'
-      signals.push('RSI สูงกว่า 70 → โซน Overbought → ราคามักกลับตัวลง')
-      signals.push('รอแท่งเทียนสีแดงยืนยันก่อนเข้า')
-      signals.push('วาง Stop Loss เหนือ High ล่าสุด')
+      action = "🔴 SELL / Short";
+      confidence = "ปานกลาง";
+      signals.push("RSI สูงกว่า 70 → โซน Overbought → ราคามักกลับตัวลง");
+      signals.push("รอแท่งเทียนสีแดงยืนยันก่อนเข้า");
+      signals.push("วาง Stop Loss เหนือ High ล่าสุด");
     } else if (value < 50) {
-      action = '🔴 SELL / Short'
-      confidence = 'ต่ำ'
-      signals.push('RSI ต่ำกว่า 50 → Momentum ขาลง')
-      signals.push('ใช้ร่วมกับ indicator อื่นยืนยัน')
+      action = "🔴 SELL / Short";
+      confidence = "ต่ำ";
+      signals.push("RSI ต่ำกว่า 50 → Momentum ขาลง");
+      signals.push("ใช้ร่วมกับ indicator อื่นยืนยัน");
     } else {
-      action = '🟢 BUY / Long'
-      confidence = 'ต่ำ'
-      signals.push('RSI สูงกว่า 50 → Momentum ขาขึ้น')
-      signals.push('ใช้ร่วมกับ indicator อื่นยืนยัน')
+      action = "🟢 BUY / Long";
+      confidence = "ต่ำ";
+      signals.push("RSI สูงกว่า 50 → Momentum ขาขึ้น");
+      signals.push("ใช้ร่วมกับ indicator อื่นยืนยัน");
     }
-  } else if (indicator === 'ema20' || indicator === 'ema50' || indicator === 'ema200') {
-    if (operator === '>' || operator === 'cross_above') {
-      action = '🟢 BUY / Long'
-      confidence = 'ปานกลาง-สูง'
-      signals.push(`ราคาอยู่เหนือ ${indicator.toUpperCase()} → แนวโน้มขาขึ้น`)
-      signals.push('เข้า Buy เมื่อราคา pullback มาแตะเส้น EMA')
-      signals.push('วาง Stop Loss ใต้เส้น EMA')
+  } else if (
+    indicator === "ema20" ||
+    indicator === "ema50" ||
+    indicator === "ema200"
+  ) {
+    if (operator === ">" || operator === "cross_above") {
+      action = "🟢 BUY / Long";
+      confidence = "ปานกลาง-สูง";
+      signals.push(`ราคาอยู่เหนือ ${indicator.toUpperCase()} → แนวโน้มขาขึ้น`);
+      signals.push("เข้า Buy เมื่อราคา pullback มาแตะเส้น EMA");
+      signals.push("วาง Stop Loss ใต้เส้น EMA");
     } else {
-      action = '🔴 SELL / Short'
-      confidence = 'ปานกลาง-สูง'
-      signals.push(`ราคาอยู่ใต้ ${indicator.toUpperCase()} → แนวโน้มขาลง`)
-      signals.push('เข้า Sell เมื่อราคา pullback มาแตะเส้น EMA')
-      signals.push('วาง Stop Loss เหนือเส้น EMA')
+      action = "🔴 SELL / Short";
+      confidence = "ปานกลาง-สูง";
+      signals.push(`ราคาอยู่ใต้ ${indicator.toUpperCase()} → แนวโน้มขาลง`);
+      signals.push("เข้า Sell เมื่อราคา pullback มาแตะเส้น EMA");
+      signals.push("วาง Stop Loss เหนือเส้น EMA");
     }
-  } else if (indicator === 'macd' || indicator === 'macdHist') {
-    if (operator === '>' || operator === 'cross_above') {
-      action = '🟢 BUY / Long'
-      confidence = 'ปานกลาง'
-      signals.push('MACD เป็นบวก → Momentum ขาขึ้น')
-      signals.push('เข้า Buy เมื่อ MACD ตัดขึ้นเหนือ Signal line')
-      signals.push('ใช้ร่วมกับ EMA เพื่อยืนยัน')
+  } else if (indicator === "macd" || indicator === "macdHist") {
+    if (operator === ">" || operator === "cross_above") {
+      action = "🟢 BUY / Long";
+      confidence = "ปานกลาง";
+      signals.push("MACD เป็นบวก → Momentum ขาขึ้น");
+      signals.push("เข้า Buy เมื่อ MACD ตัดขึ้นเหนือ Signal line");
+      signals.push("ใช้ร่วมกับ EMA เพื่อยืนยัน");
     } else {
-      action = '🔴 SELL / Short'
-      confidence = 'ปานกลาง'
-      signals.push('MACD เป็นลบ → Momentum ขาลง')
-      signals.push('เข้า Sell เมื่อ MACD ตัดลงใต้ Signal line')
-      signals.push('ใช้ร่วมกับ EMA เพื่อยืนยัน')
+      action = "🔴 SELL / Short";
+      confidence = "ปานกลาง";
+      signals.push("MACD เป็นลบ → Momentum ขาลง");
+      signals.push("เข้า Sell เมื่อ MACD ตัดลงใต้ Signal line");
+      signals.push("ใช้ร่วมกับ EMA เพื่อยืนยัน");
     }
-  } else if (indicator === 'bbUpper') {
-    action = '🔴 SELL / Short'
-    confidence = 'ปานกลาง'
-    signals.push('ราคาแตะ Bollinger Band บน → โซน Overbought')
-    signals.push('มักเกิด reversal กลับลงมา')
-    signals.push('รอแท่งเทียนยืนยันก่อนเข้า Sell')
-  } else if (indicator === 'bbLower') {
-    action = '🟢 BUY / Long'
-    confidence = 'ปานกลาง'
-    signals.push('ราคาแตะ Bollinger Band ล่าง → โซน Oversold')
-    signals.push('มักเกิด reversal กลับขึ้นไป')
-    signals.push('รอแท่งเทียนยืนยันก่อนเข้า Buy')
+  } else if (indicator === "bbUpper") {
+    action = "🔴 SELL / Short";
+    confidence = "ปานกลาง";
+    signals.push("ราคาแตะ Bollinger Band บน → โซน Overbought");
+    signals.push("มักเกิด reversal กลับลงมา");
+    signals.push("รอแท่งเทียนยืนยันก่อนเข้า Sell");
+  } else if (indicator === "bbLower") {
+    action = "🟢 BUY / Long";
+    confidence = "ปานกลาง";
+    signals.push("ราคาแตะ Bollinger Band ล่าง → โซน Oversold");
+    signals.push("มักเกิด reversal กลับขึ้นไป");
+    signals.push("รอแท่งเทียนยืนยันก่อนเข้า Buy");
   } else {
-    action = operator === '>' || operator === '>=' || operator === 'cross_above'
-      ? '🟢 BUY / Long' : '🔴 SELL / Short'
-    confidence = 'ปานกลาง'
-    signals.push(`${indicator.toUpperCase()} ผ่านเงื่อนไข ${operator} ${threshold}`)
+    action =
+      operator === ">" || operator === ">=" || operator === "cross_above"
+        ? "🟢 BUY / Long"
+        : "🔴 SELL / Short";
+    confidence = "ปานกลาง";
+    signals.push(
+      `${indicator.toUpperCase()} ผ่านเงื่อนไข ${operator} ${threshold}`,
+    );
   }
 
-  return { action, confidence, signals }
+  return { action, confidence, signals };
 }
 
-async function sendAlertEmail({ indicator, operator, threshold, value, price }) {
-  const { action, confidence, signals } = getSignalAdvice(indicator, operator, threshold, value)
+async function sendAlertEmail({
+  indicator,
+  operator,
+  threshold,
+  value,
+  price,
+}) {
+  const { action, confidence, signals } = getSignalAdvice(
+    indicator,
+    operator,
+    threshold,
+    value,
+  );
 
-  const operatorLabel = {
-    '>': 'มากกว่า', '<': 'น้อยกว่า',
-    '>=': 'มากกว่าหรือเท่ากับ', '<=': 'น้อยกว่าหรือเท่ากับ',
-    'cross_above': 'ข้ามขึ้นเหนือ', 'cross_below': 'ข้ามลงต่ำกว่า',
-  }[operator] || operator
+  const operatorLabel =
+    {
+      ">": "มากกว่า",
+      "<": "น้อยกว่า",
+      ">=": "มากกว่าหรือเท่ากับ",
+      "<=": "น้อยกว่าหรือเท่ากับ",
+      cross_above: "ข้ามขึ้นเหนือ",
+      cross_below: "ข้ามลงต่ำกว่า",
+    }[operator] || operator;
 
-  const actionColor = action.includes('BUY') ? '#16a34a' : action.includes('SELL') ? '#dc2626' : '#6b7280'
-  const emoji = action.includes('BUY') ? '🟢' : action.includes('SELL') ? '🔴' : '⚪'
-  const subject = `${emoji} Gold Alert: ${indicator.toUpperCase()} ${operatorLabel} ${threshold}`
+  const actionColor = action.includes("BUY")
+    ? "#16a34a"
+    : action.includes("SELL")
+      ? "#dc2626"
+      : "#6b7280";
+  const emoji = action.includes("BUY")
+    ? "🟢"
+    : action.includes("SELL")
+      ? "🔴"
+      : "⚪";
+  const subject = `${emoji} Gold Alert: ${indicator.toUpperCase()} ${operatorLabel} ${threshold}`;
 
-  const signalRows = signals.map(s => `
+  const signalRows = signals
+    .map(
+      (s) => `
     <tr>
       <td style="padding:6px 8px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6">• ${s}</td>
     </tr>
-  `).join('')
+  `,
+    )
+    .join("");
 
   const html = `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#f9fafb;padding:20px;border-radius:12px">
@@ -130,7 +165,7 @@ async function sendAlertEmail({ indicator, operator, threshold, value, price }) 
           </tr>
           <tr style="background:#f3f4f6">
             <td style="padding:10px 16px;font-size:12px;color:#6b7280">เวลา</td>
-            <td style="padding:10px 16px;font-size:13px;color:#374151">${new Date().toLocaleString('th-TH')}</td>
+            <td style="padding:10px 16px;font-size:13px;color:#374151">${new Date().toLocaleString("th-TH")}</td>
           </tr>
         </table>
       </div>
@@ -145,14 +180,14 @@ async function sendAlertEmail({ indicator, operator, threshold, value, price }) 
       </div>
       <p style="color:#9ca3af;font-size:11px;text-align:center;margin:0">แจ้งเตือนจาก XAU/USD Gold Dashboard</p>
     </div>
-  `
+  `;
 
   await sgMail.send({
-    to:      process.env.GMAIL_USER,
-    from:    process.env.GMAIL_USER,
+    to: process.env.ALERT_EMAIL_TO || process.env.GMAIL_USER,
+    from: process.env.GMAIL_USER,
     subject,
     html,
-  })
+  });
 }
 
-module.exports = { sendAlertEmail }
+module.exports = { sendAlertEmail };
