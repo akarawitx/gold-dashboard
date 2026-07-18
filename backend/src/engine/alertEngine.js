@@ -3,6 +3,8 @@ const pool      = require('../db')
 const { getCandles }       = require('../services/twelvedata')
 const { getLatestValues, checkCondition } = require('./indicators')
 const { sendAlertEmail }   = require('../services/mailer')
+const { sendTelegramAlert } = require('../services/telegram')
+
 
 async function runAlertCheck() {
   try {
@@ -45,6 +47,16 @@ async function runAlertCheck() {
 
         // ส่งอีเมล
         try {
+          // ส่ง Telegram
+          await sendTelegramAlert({
+            indicator: alert.indicator,
+            operator:  alert.operator,
+            threshold: alert.threshold,
+            value:     indicatorVal,
+            price:     values.price,
+          })
+
+          // ส่งอีเมลด้วย (ถ้าต้องการ)
           await sendAlertEmail({
             indicator: alert.indicator,
             operator:  alert.operator,
