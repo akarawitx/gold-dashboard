@@ -1,6 +1,6 @@
 # XAU/USD Gold Trading Dashboard
 
-เว็บไซต์ส่วนตัวสำหรับดูกราฟราคาทองคำ (XAU/USD) แบบ realtime พร้อมระบบ indicator, แจ้งเตือนทางอีเมล และบันทึก Win Rate
+เว็บไซต์ส่วนตัวสำหรับดูกราฟราคาทองคำ (XAU/USD) แบบ realtime พร้อมระบบ indicator, แจ้งเตือนผ่าน Telegram + อีเมล และบันทึก Win Rate
 
 ## Live Demo
 
@@ -16,7 +16,7 @@
 ### กราฟ (Chart Module)
 - กราฟแท่งเทียน XAU/USD แบบ realtime ผ่าน WebSocket
 - เปลี่ยน Timeframe ได้ 7 ระดับ: M1, M5, M15, M30, H1, H4, D1
-- ระบบ Historical Data Caching เก็บแท่งเทียนลง Database สะสมไปเรื่อยๆ
+- ระบบ Historical Data Caching เก็บแท่งเทียนลง Database สะสมไปเรื่อยๆ ยิ่งใช้นานยิ่งมีข้อมูลเยอะ
 - Zoom / Pan ได้อิสระ พร้อม Crosshair แสดง OHLC
 
 ### Indicator (toggle เปิด/ปิดได้ทุกตัว)
@@ -28,9 +28,10 @@
 - **ATR 14** — แสดงตัวเลขใน header
 
 ### Alert System
-- ตั้งเงื่อนไขได้หลายรูปแบบ เช่น RSI < 30, EMA cross
+- ตั้งเงื่อนไขได้หลายรูปแบบ เช่น RSI < 30, MACD > 0
 - cron job ตรวจทุก 1 นาทีตลอด 24 ชั่วโมง
-- ส่งอีเมลแจ้งเตือนพร้อมคำแนะนำ Buy/Sell อัตโนมัติ
+- แจ้งเตือนผ่าน **Telegram Bot** ทันที ไม่มีปัญหา spam
+- แจ้งเตือนผ่าน **อีเมล** (SendGrid) พร้อมคำแนะนำ Buy/Sell
 - ระบบ Cooldown ป้องกัน spam
 - เปิด/ปิด alert แต่ละตัวได้
 
@@ -59,7 +60,8 @@
 |-----------|----------|
 | Node.js + Express | API server |
 | node-cron | ตรวจ alert ทุก 1 นาที |
-| Nodemailer | ส่งอีเมลผ่าน Gmail SMTP |
+| @sendgrid/mail | ส่งอีเมลผ่าน SendGrid API |
+| Axios (Telegram) | ส่งแจ้งเตือนผ่าน Telegram Bot API |
 | ws (WebSocket) | รับ tick จาก Finnhub + ส่งให้ Frontend |
 | pg (node-postgres) | เชื่อมต่อ PostgreSQL |
 | dotenv | จัดการ environment variables |
@@ -76,6 +78,12 @@
 |-----|----------|
 | Twelve Data | ดึง OHLC candle data ย้อนหลัง (800 req/วัน) |
 | Finnhub WebSocket | รับราคา tick realtime |
+
+### Notification
+| ช่องทาง | Service | หมายเหตุ |
+|---------|---------|---------|
+| Telegram | Telegram Bot API | แนะนำ — ไม่มี spam, รับทันที |
+| Email | SendGrid (100 อีเมล/วัน ฟรี) | สำรอง |
 
 ### Deployment
 | ส่วน | Platform |
@@ -127,11 +135,12 @@
 │   └──────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                                │
-                               ▼
-                    ┌──────────────────┐
-                    │   Gmail SMTP     │
-                    │ (Email Alerts)   │
-                    └──────────────────┘
+                    ┌──────────┴──────────┐
+                    ▼                     ▼
+           ┌──────────────┐     ┌──────────────────┐
+           │  Telegram    │     │  SendGrid Email  │
+           │  Bot API     │     │  (Backup)        │
+           └──────────────┘     └──────────────────┘
 ```
 
 ---
@@ -143,7 +152,7 @@
 User เปิดเว็บ
   → Frontend ส่ง GET /api/candles?interval=1h
   → Backend เช็ค DB ก่อน (candleCache)
-  → ถ้ามีใน DB → ส่งกลับทันที (เร็ว)
+  → ถ้ามีใน DB → ส่งกลับทันที (เร็ว, ไม่เปลือง API)
   → ถ้าไม่มี → ดึงจาก Twelve Data API → เก็บลง DB → ส่งกลับ
   → Frontend วาดกราฟด้วย Lightweight Charts
   → คำนวณ indicator (EMA, RSI, MACD, BB, Stoch, ATR)
@@ -163,17 +172,19 @@ node-cron ทุก 1 นาที
   → alertEngine.js ดึง active alerts จาก DB
   → ดึง candle data มาคำนวณ indicator
   → เช็ค cooldown แต่ละ alert
-  → ถ้าตรงเงื่อนไข → บันทึก alert_log → ส่งอีเมลผ่าน Gmail SMTP
-  → อีเมลมีราคา, ค่า indicator, คำแนะนำ Buy/Sell
+  → ถ้าตรงเงื่อนไข → บันทึก alert_log
+    → ส่ง Telegram Bot (หลัก)
+    → ส่ง Email SendGrid (สำรอง)
 ```
 
 ### 4. Historical Caching
 ```
 Backend เริ่มต้น
-  → sync ทุก timeframe (15min, 30min, 1h, 4h, 1day)
+  → sync ทุก timeframe (1min, 5min, 15min, 30min, 1h, 4h, 1day)
   → ถ้าไม่มีข้อมูล → ดึง 5000 แท่งแรก
   → ถ้ามีแล้ว → ดึงเฉพาะแท่งใหม่ที่ขาด
   → cron ทุก 1 ชั่วโมง → sync อัตโนมัติ
+  → ยิ่งใช้นาน ข้อมูลสะสมมากขึ้น ดูย้อนหลังได้มากขึ้น
 ```
 
 ---
@@ -243,7 +254,7 @@ CREATE TABLE settings (
 ### Candles
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/candles?symbol=XAU/USD&interval=1h` | ดึงข้อมูลแท่งเทียน |
+| GET | `/api/candles?symbol=XAU/USD&interval=1h` | ดึงข้อมูลแท่งเทียน (จาก DB cache) |
 
 ### Alerts
 | Method | Endpoint | Description |
@@ -307,11 +318,11 @@ gold-dashboard/
 │   │   │   ├── twelvedata.js       # ดึง candle จาก Twelve Data
 │   │   │   ├── finnhub.js          # WebSocket client Finnhub
 │   │   │   ├── candleCache.js      # Historical caching logic
-│   │   │   └── mailer.js           # ส่งอีเมลผ่าน Gmail
+│   │   │   ├── mailer.js           # ส่งอีเมลผ่าน SendGrid
+│   │   │   └── telegram.js         # ส่งแจ้งเตือนผ่าน Telegram Bot
 │   │   ├── engine/
 │   │   │   ├── indicators.js       # คำนวณ indicator ฝั่ง server
-│   │   │   ├── alertEngine.js      # cron ตรวจเงื่อนไขทุก 1 นาที
-│   │   │   └── cronJob.js          # cron jobs ต่างๆ
+│   │   │   └── alertEngine.js      # cron ตรวจเงื่อนไขทุก 1 นาที
 │   │   ├── ws/
 │   │   │   └── wsServer.js         # WebSocket server
 │   │   ├── db.js                   # PostgreSQL connection pool
@@ -333,7 +344,8 @@ gold-dashboard/
 - Node.js v18+
 - Docker Desktop
 - API Keys: Twelve Data, Finnhub
-- Gmail + App Password
+- SendGrid API Key (ส่งอีเมล)
+- Telegram Bot Token + Chat ID
 
 ### 1. Clone Repository
 ```bash
@@ -346,20 +358,32 @@ cd gold-dashboard
 **backend/.env**
 ```
 PORT=3001
+
+# Database (Local)
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=golddashboard
 DB_USER=postgres
 DB_PASSWORD=postgres123
+
+# API Keys
 TWELVE_DATA_KEY=your_key
 FINNHUB_KEY=your_key
-GMAIL_USER=your@gmail.com
-GMAIL_APP_PASSWORD=your_app_password
+
+# Email (SendGrid)
+SENDGRID_API_KEY=SG.xxxxxxxxxx
+GMAIL_USER=sender@gmail.com
+ALERT_EMAIL_TO=receiver@gmail.com
+
+# Telegram
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
 ```
 
 **frontend/.env**
 ```
-VITE_TWELVE_DATA_KEY=your_key
+VITE_API_URL=http://localhost:3001
+VITE_WS_URL=ws://localhost:3001
 ```
 
 ### 3. รัน PostgreSQL
@@ -396,16 +420,17 @@ http://localhost:5173
 
 ---
 
-## Indicators ที่ใช้
+## การตั้งค่า Telegram Bot
 
-| Indicator | ประเภท | ใช้ทำอะไร | สัญญาณ |
-|-----------|--------|----------|--------|
-| EMA 20/50/200 | Trend | ทิศทาง trend หลัก | ราคาเหนือ EMA = Bullish |
-| RSI 14 | Momentum | Overbought/Oversold | < 30 = Oversold (Buy), > 70 = Overbought (Sell) |
-| MACD | Momentum | Signal crossover | MACD ตัด Signal ขึ้น = Buy |
-| Bollinger Bands | Volatility | ช่วงราคา + Squeeze | แตะ Lower = Buy, แตะ Upper = Sell |
-| ATR 14 | Volatility | ขนาด Stop Loss | ค่ายิ่งสูง ยิ่งผันผวน |
-| Stochastic | Momentum | จุดกลับตัว | < 20 = Oversold, > 80 = Overbought |
+1. เปิด Telegram ค้นหา `@BotFather`
+2. พิมพ์ `/newbot` แล้วตั้งชื่อ Bot
+3. Copy **Bot Token** ที่ได้รับ
+4. เปิด Chat กับ Bot แล้วพิมพ์ `/start`
+5. เปิด URL นี้เพื่อหา Chat ID:
+```
+https://api.telegram.org/bot{TOKEN}/getUpdates
+```
+6. ใส่ `TELEGRAM_BOT_TOKEN` และ `TELEGRAM_CHAT_ID` ใน `.env`
 
 ---
 
@@ -417,8 +442,39 @@ http://localhost:5173
 | `<` | น้อยกว่า | RSI < 30 |
 | `>=` | มากกว่าหรือเท่ากับ | RSI >= 70 |
 | `<=` | น้อยกว่าหรือเท่ากับ | RSI <= 30 |
-| `cross_above` | ข้ามขึ้นเหนือ | MACD cross above Signal |
-| `cross_below` | ข้ามลงต่ำกว่า | MACD cross below Signal |
+| `cross_above` | ข้ามขึ้นเหนือ | MACD cross above 0 |
+| `cross_below` | ข้ามลงต่ำกว่า | MACD cross below 0 |
+
+---
+
+## Indicators ที่ใช้
+
+| Indicator | ประเภท | สัญญาณ | Cooldown แนะนำ |
+|-----------|--------|--------|---------------|
+| RSI 14 | Momentum | < 30 = Buy, > 70 = Sell | H1: 60 นาที, H4: 240 นาที |
+| EMA 20/50/200 | Trend | ราคาเหนือ EMA = Bullish | H1: 120 นาที |
+| MACD | Momentum | > 0 = Buy, < 0 = Sell | H1: 240 นาที |
+| MACD Histogram | Momentum | > 0 = Buy momentum | H4: 480 นาที |
+| Bollinger Bands | Volatility | แตะ Lower = Buy, Upper = Sell | H1: 60 นาที |
+| ATR 14 | Volatility | ใช้กำหนด Stop Loss | — |
+| Stochastic | Momentum | < 20 = Oversold, > 80 = Overbought | H1: 60 นาที |
+
+---
+
+## ชุด Alert แนะนำ
+
+| Indicator | เงื่อนไข | ค่า | Timeframe | Cooldown | ความหมาย |
+|-----------|---------|-----|-----------|---------|---------|
+| RSI | < | 20 | H1 | 120 | Oversold รุนแรง Buy |
+| RSI | < | 30 | H1 | 60 | Oversold Buy |
+| RSI | > | 70 | H1 | 60 | Overbought Sell |
+| RSI | < | 30 | H4 | 240 | Oversold Buy แรง |
+| RSI | > | 70 | H4 | 240 | Overbought Sell แรง |
+| RSI | > | 50 | H4 | 240 | Trend ขาขึ้น |
+| RSI | < | 50 | H4 | 240 | Trend ขาลง |
+| MACD | > | 0 | H1 | 240 | Momentum ขาขึ้น |
+| MACD | < | 0 | H1 | 240 | Momentum ขาลง |
+| MACD Histogram | < | 0 | H4 | 480 | Momentum ขาลงระยะกลาง |
 
 ---
 
@@ -428,9 +484,12 @@ http://localhost:5173
 |---------|-------|
 | Twelve Data | 800 req/วัน, 5000 แท่ง/request |
 | Finnhub | 60 req/นาที, WebSocket ≤ 50 symbols |
+| SendGrid | 100 อีเมล/วัน ฟรีตลอดชีพ |
+| Telegram | ไม่จำกัด ฟรี |
 | Render | Sleep หลังไม่มีการใช้งาน (แก้ด้วย UptimeRobot) |
 | Neon | 0.5GB storage, scale to zero 5 นาที (wake อัตโนมัติ) |
 | Vercel | ไม่มี limit สำหรับ static frontend |
+| UptimeRobot | Ping ทุก 5 นาที ฟรี |
 
 ---
 
